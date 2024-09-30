@@ -2,30 +2,27 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
 )
 
 func main() {
-	fmt.Println("what is today's lucky number?")
+	src := []int{1, 2, 3, 4, 5}
+	dst := []int{}
 
 	c := make(chan int)
-	go getLuckyNum(c)
 
-	num := <-c
+	for _, s := range src {
+		go func(s int, c chan int) {
+			result := s * 2
+			c <- result
+		}(s, c)
+	}
 
-	fmt.Println("Today's lucky number is", num)
+	for _ = range src {
+		result := <-c
+		dst = append(dst, result)
+	}
 
+	fmt.Println(dst)
 	close(c)
 }
 
-func getLuckyNum(c chan<- int) {
-	fmt.Println("...")
-
-	// 占いにかかる時間はランダム
-	rand.Seed(time.Now().Unix())
-	time.Sleep(time.Duration(rand.Intn(3000)) * time.Millisecond)
-
-	num := rand.Intn(10)
-	c <- num
-}
