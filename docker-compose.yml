@@ -4,7 +4,7 @@ services:
   broadcast-grpc-server:
     container_name: broadcast-grpc-server
     volumes:
-      - ./:/gabaithon-grpc-server
+      - ./backend/:/broadcast-grpc-server
     tty: true
     build:
       context: .
