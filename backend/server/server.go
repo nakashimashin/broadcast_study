@@ -12,7 +12,7 @@ import (
 )
 
 type server struct {
-    pb.UnimplementedChatRoomServer // 追加
+    pb.UnimplementedChatRoomServer
     clients map[string]pb.ChatRoom_ChatServer
     mu      sync.RWMutex
 }

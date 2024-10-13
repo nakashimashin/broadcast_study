@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package match;
+
+option go_package = "pkg/grpc";
+
+enum GameType {
+    KEY_COLLECTION = 0;
+    Battle_Game = 1;
+    Janken = 2;
+}
+
+service MatchRoom {
+    rpc Matching (MatchRequest) returns (stream MatchResponse);
+}
+
+message MatchRequest {
+    string player_id = 1;
+    GameType game_type = 2;
+}
+
+message MatchResponse {
+    string message = 1;
+    string room_id = 2;
+    string player_id = 3;
+    GameType game_type = 4;
+}
+
