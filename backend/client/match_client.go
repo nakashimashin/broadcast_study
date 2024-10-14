@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -79,17 +80,18 @@ func keyCollectGame(c pb.MatchRoomClient, playerID, roomID string) {
     }
 
     totalKeys := 0
-    gameOver := false
 
     // サーバーからの進捗メッセージを非同期で受け取るためのゴルーチン
     go func() {
         for {
             resp, err := stream.Recv()
+            if err == io.EOF {
+                fmt.Println("Stream closed by server.")
+                os.Exit(0)  // サーバー側がストリームを閉じたら終了
+            }
             if err != nil {
-                if !gameOver {
-                    log.Fatalf("failed to receive key collect response: %v", err)
-                }
-                break
+                log.Printf("failed to receive key collect response: %v", err)
+                os.Exit(1)  // エラーが発生した場合はエラーコードで終了
             }
 
             fmt.Printf("Message: %s, RoomID: %s, Keys: %v\n", resp.Message, resp.RoomId, resp.PlayerKeys)
@@ -97,8 +99,11 @@ func keyCollectGame(c pb.MatchRoomClient, playerID, roomID string) {
             // ゲーム終了メッセージの受信
             if resp.IsGameOver {
                 fmt.Printf("Game over! Result: %s\n", resp.Result)
-                gameOver = true
-                break
+                err = stream.CloseSend()  // ストリームを閉じる
+                if err != nil {
+                    log.Fatalf("failed to close stream: %v", err)
+                }
+                os.Exit(0)  // ゲーム終了時にプログラムを終了
             }
         }
     }()
@@ -114,12 +119,12 @@ func keyCollectGame(c pb.MatchRoomClient, playerID, roomID string) {
     }
 
     reader := bufio.NewReader(os.Stdin)
-    for totalKeys < 5 && !gameOver {
+    for {
         fmt.Print("Type 'Get' to collect a key: ")
+
         input, _ := reader.ReadString('\n')
         input = input[:len(input)-1]
 
-        // "Get" を入力した場合に鍵を取得
         if input == "Get" {
             totalKeys++
             err := stream.Send(&pb.KeyCollectRequest{
@@ -131,9 +136,5 @@ func keyCollectGame(c pb.MatchRoomClient, playerID, roomID string) {
                 log.Fatalf("failed to send key collect request: %v", err)
             }
         }
-    }
-
-    if gameOver {
-        stream.CloseSend()
     }
 }
