@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MatchRoom_Matching_FullMethodName = "/match.MatchRoom/Matching"
+	MatchRoom_Matching_FullMethodName   = "/match.MatchRoom/Matching"
+	MatchRoom_KeyCollect_FullMethodName = "/match.MatchRoom/KeyCollect"
 )
 
 // MatchRoomClient is the client API for MatchRoom service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MatchRoomClient interface {
 	Matching(ctx context.Context, in *MatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MatchResponse], error)
+	KeyCollect(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[KeyCollectRequest, KeyCollectResponse], error)
 }
 
 type matchRoomClient struct {
@@ -56,11 +58,25 @@ func (c *matchRoomClient) Matching(ctx context.Context, in *MatchRequest, opts .
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MatchRoom_MatchingClient = grpc.ServerStreamingClient[MatchResponse]
 
+func (c *matchRoomClient) KeyCollect(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[KeyCollectRequest, KeyCollectResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &MatchRoom_ServiceDesc.Streams[1], MatchRoom_KeyCollect_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[KeyCollectRequest, KeyCollectResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MatchRoom_KeyCollectClient = grpc.BidiStreamingClient[KeyCollectRequest, KeyCollectResponse]
+
 // MatchRoomServer is the server API for MatchRoom service.
 // All implementations must embed UnimplementedMatchRoomServer
 // for forward compatibility.
 type MatchRoomServer interface {
 	Matching(*MatchRequest, grpc.ServerStreamingServer[MatchResponse]) error
+	KeyCollect(grpc.BidiStreamingServer[KeyCollectRequest, KeyCollectResponse]) error
 	mustEmbedUnimplementedMatchRoomServer()
 }
 
@@ -73,6 +89,9 @@ type UnimplementedMatchRoomServer struct{}
 
 func (UnimplementedMatchRoomServer) Matching(*MatchRequest, grpc.ServerStreamingServer[MatchResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Matching not implemented")
+}
+func (UnimplementedMatchRoomServer) KeyCollect(grpc.BidiStreamingServer[KeyCollectRequest, KeyCollectResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method KeyCollect not implemented")
 }
 func (UnimplementedMatchRoomServer) mustEmbedUnimplementedMatchRoomServer() {}
 func (UnimplementedMatchRoomServer) testEmbeddedByValue()                   {}
@@ -106,6 +125,13 @@ func _MatchRoom_Matching_Handler(srv interface{}, stream grpc.ServerStream) erro
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MatchRoom_MatchingServer = grpc.ServerStreamingServer[MatchResponse]
 
+func _MatchRoom_KeyCollect_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MatchRoomServer).KeyCollect(&grpc.GenericServerStream[KeyCollectRequest, KeyCollectResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MatchRoom_KeyCollectServer = grpc.BidiStreamingServer[KeyCollectRequest, KeyCollectResponse]
+
 // MatchRoom_ServiceDesc is the grpc.ServiceDesc for MatchRoom service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -118,6 +144,12 @@ var MatchRoom_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "Matching",
 			Handler:       _MatchRoom_Matching_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "KeyCollect",
+			Handler:       _MatchRoom_KeyCollect_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "match.proto",
