@@ -38,5 +38,5 @@ message KeyCollectResponse {
     string room_id = 2;
     map<string, int32> player_keys = 3;
     bool is_game_over = 4;
-    GameType game_type = 5;
+    string result = 5;
 }
