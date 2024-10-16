@@ -5,9 +5,12 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
 	"sync"
 )
@@ -226,19 +229,37 @@ func (s *server) Matching(req *pb.MatchRequest, stream pb.MatchRoom_MatchingServ
 
 func main() {
 	addr := ":50051"
+
+	grpcServer := grpc.NewServer()
+	pb.RegisterMatchRoomServer(grpcServer, &server{
+		waitingPlayers: make(map[pb.GameType][]waitingPlayer),
+		activeRooms: make(map[string]*gameRoom),
+	})
+	reflection.Register(grpcServer)
+
+	grpcWebServer := grpcweb.WrapServer(grpcServer, grpcweb.WithCorsForRegisteredEndpointsOnly(false), grpcweb.WithOriginFunc(func(origin string) bool { return true }))
+
+	handler := func(resp http.ResponseWriter, req *http.Request) {
+		if grpcWebServer.IsGrpcWebRequest(req) || grpcWebServer.IsGrpcWebSocketRequest(req) {
+			grpcWebServer.ServeHTTP(resp, req)
+			return
+		}
+		http.NotFound(resp, req)
+	}
+
+	httpServer := &http.Server{
+		Addr:    addr,
+		Handler: http.HandlerFunc(handler),
+	}
+
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	s := grpc.NewServer()
-	pb.RegisterMatchRoomServer(s, &server{
-		waitingPlayers: make(map[pb.GameType][]waitingPlayer),
-		activeRooms: make(map[string]*gameRoom),
-	})
-
-	log.Printf("Server listening at %v", addr)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	log.Printf("gRPCとgRPC-Webリクエストを処理 %v", addr)
+	if err := httpServer.Serve(lis); err != nil {
+		log.Fatalf("failed to start HTTP server: %v", err)
 	}
+
 }
