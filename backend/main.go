@@ -2,10 +2,12 @@ package main
 
 import (
 	pb "broadcast_study/pkg/grpc"
+	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
+	"os"
+	"os/signal"
 
 	"github.com/google/uuid"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -228,17 +230,18 @@ func (s *server) Matching(req *pb.MatchRequest, stream pb.MatchRoom_MatchingServ
 }
 
 func main() {
-	addr := ":50051"
-
+	port := 8081
 	grpcServer := grpc.NewServer()
 	pb.RegisterMatchRoomServer(grpcServer, &server{
 		waitingPlayers: make(map[pb.GameType][]waitingPlayer),
-		activeRooms: make(map[string]*gameRoom),
+		activeRooms:    make(map[string]*gameRoom),
 	})
 	reflection.Register(grpcServer)
 
+	// gRPC-Web サーバーのラップ
 	grpcWebServer := grpcweb.WrapServer(grpcServer, grpcweb.WithCorsForRegisteredEndpointsOnly(false), grpcweb.WithOriginFunc(func(origin string) bool { return true }))
 
+	// HTTP サーバーの起動とリクエストハンドリング
 	handler := func(resp http.ResponseWriter, req *http.Request) {
 		if grpcWebServer.IsGrpcWebRequest(req) || grpcWebServer.IsGrpcWebSocketRequest(req) {
 			grpcWebServer.ServeHTTP(resp, req)
@@ -248,18 +251,20 @@ func main() {
 	}
 
 	httpServer := &http.Server{
-		Addr:    addr,
+		Addr:    fmt.Sprintf(":%d", port),
 		Handler: http.HandlerFunc(handler),
 	}
 
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
+	log.Printf("Server started on port %v", port)
+	go func() {
+		if err := httpServer.ListenAndServe(); err != nil {
+			log.Fatalf("failed to start server: %v", err)
+		}
+	}()
 
-	log.Printf("gRPCとgRPC-Webリクエストを処理 %v", addr)
-	if err := httpServer.Serve(lis); err != nil {
-		log.Fatalf("failed to start HTTP server: %v", err)
-	}
-
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+	log.Println("Stopping server...")
+	grpcServer.GracefulStop()
 }
