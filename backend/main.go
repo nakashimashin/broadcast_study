@@ -2,12 +2,17 @@ package main
 
 import (
 	pb "broadcast_study/pkg/grpc"
+	"fmt"
 	"io"
 	"log"
-	"net"
+	"net/http"
+	"os"
+	"os/signal"
 
 	"github.com/google/uuid"
+	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
 	"sync"
 )
@@ -225,20 +230,41 @@ func (s *server) Matching(req *pb.MatchRequest, stream pb.MatchRoom_MatchingServ
 }
 
 func main() {
-	addr := ":50051"
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-
-	s := grpc.NewServer()
-	pb.RegisterMatchRoomServer(s, &server{
+	port := 8081
+	grpcServer := grpc.NewServer()
+	pb.RegisterMatchRoomServer(grpcServer, &server{
 		waitingPlayers: make(map[pb.GameType][]waitingPlayer),
-		activeRooms: make(map[string]*gameRoom),
+		activeRooms:    make(map[string]*gameRoom),
 	})
+	reflection.Register(grpcServer)
 
-	log.Printf("Server listening at %v", addr)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	// gRPC-Web サーバーのラップ
+	grpcWebServer := grpcweb.WrapServer(grpcServer, grpcweb.WithCorsForRegisteredEndpointsOnly(false), grpcweb.WithOriginFunc(func(origin string) bool { return true }))
+
+	// HTTP サーバーの起動とリクエストハンドリング
+	handler := func(resp http.ResponseWriter, req *http.Request) {
+		if grpcWebServer.IsGrpcWebRequest(req) || grpcWebServer.IsGrpcWebSocketRequest(req) {
+			grpcWebServer.ServeHTTP(resp, req)
+			return
+		}
+		http.NotFound(resp, req)
 	}
+
+	httpServer := &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: http.HandlerFunc(handler),
+	}
+
+	log.Printf("Server started on port %v", port)
+	go func() {
+		if err := httpServer.ListenAndServe(); err != nil {
+			log.Fatalf("failed to start server: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+	log.Println("Stopping server...")
+	grpcServer.GracefulStop()
 }
