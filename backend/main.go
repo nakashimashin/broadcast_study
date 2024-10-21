@@ -264,6 +264,7 @@ func main() {
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
+	log.Panicln("確認してる")
 	<-quit
 	log.Println("Stopping server...")
 	grpcServer.GracefulStop()
