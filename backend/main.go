@@ -40,11 +40,13 @@ type server struct {
 func (s *server) addPlayer(playerID string, gameType pb.GameType, stream pb.MatchRoom_MatchingServer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	// プレイヤーを待機プレイヤーに追加
 	s.waitingPlayers[gameType] = append(s.waitingPlayers[gameType], waitingPlayer{
 		playerID: playerID,
 		stream:   stream,
 		gameType: gameType,
 	})
+	log.Println(playerID, "を追加しました")
 }
 
 func (s *server) removePlayer(playerID string, gameType pb.GameType) {
@@ -63,20 +65,26 @@ func (s* server) matchPlayers(gameType pb.GameType) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// 指定したゲームタイプの待機プレイヤーを取得
 	players := s.waitingPlayers[gameType]
 	if len(players) >= 2 {
+
+		// マッチングしたプレイヤーを取得
+		// ここでは最初の2人を取得
 		player1 := players[0]
 		player2 := players[1]
 
+		// Room: ユニークなroomIDを生成
 		roomID := uuid.Must(uuid.NewRandom()).String()
 
 		// Room: マッチングしたプレイヤーを登録
 		room := &gameRoom{
 			roomID: roomID,
-			players: map[string]int32{player1.playerID: 0, player2.playerID: 0},
+			players: map[string]int32{player1.playerID: 0, player2.playerID: 0}, // 初期は鍵の数を0に設定
 			playerStreams: map[string]pb.MatchRoom_KeyCollectServer{},
 		}
 
+		// Room: アクティブな部屋に登録
 		s.activeRooms[roomID] = room
 
 		// Broadcast: 全てのプレイヤーにマッチングを通知
@@ -102,6 +110,7 @@ func (s* server) matchPlayers(gameType pb.GameType) {
 			}
 		}()
 
+		// マッチングしたプレイヤーを待機プレイヤーから削除
 		s.waitingPlayers[gameType] = s.waitingPlayers[gameType][2:]
 	}
 }
@@ -110,6 +119,7 @@ func (s *server) KeyCollect(stream pb.MatchRoom_KeyCollectServer) error {
     var roomID string
     var playerID string
 
+	// ストリームからのリクエストを受け取る(プレイヤーからのリクエスト)
     req, err := stream.Recv()
     if err != nil {
         log.Printf("error receiving key collect request: %v", err)
