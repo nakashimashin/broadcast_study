@@ -116,6 +116,8 @@ func (s* server) matchPlayers(gameType pb.GameType) {
 }
 
 func (s *server) KeyCollect(stream pb.MatchRoom_KeyCollectServer) error {
+	// プレイヤーがKeyCollect streamを開いたことを通知
+	log.Println("KeyCollect stream opened")
     var roomID string
     var playerID string
 
@@ -128,6 +130,9 @@ func (s *server) KeyCollect(stream pb.MatchRoom_KeyCollectServer) error {
 
     roomID = req.RoomId
     playerID = req.PlayerId
+	// プレイヤーがどのRoomIDにリクエストを送っているかを確認
+	log.Printf("Received KeyCollect request for RoomID: %s, PlayerID: %s", roomID, playerID)
+
 
     // 部屋が存在するか確認
     s.mu.RLock()
@@ -145,9 +150,10 @@ func (s *server) KeyCollect(stream pb.MatchRoom_KeyCollectServer) error {
     // プレイヤーをstreamに登録
     room.mu.Lock()
     room.playerStreams[playerID] = stream
-
+	log.Printf("Player %s registered in room %s", playerID, roomID)
     // 全プレイヤーが揃った場合のみ初回通知を送信
     if len(room.playerStreams) == 2 {
+		log.Printf("2人のプレイヤーが揃いました")
         for pid, playerStream := range room.playerStreams {
             err := playerStream.Send(&pb.KeyCollectResponse{
                 Message:    "ゲームが開始されました",
