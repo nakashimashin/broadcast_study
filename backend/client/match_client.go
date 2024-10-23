@@ -17,7 +17,7 @@ import (
 
 func main() {
     // サーバーアドレス
-    addr := "localhost:50051"
+    addr := "localhost:8081"
     conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
     if err != nil {
         log.Fatalf("did not connect: %v", err)

@@ -5,14 +5,10 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
-	"os"
-	"os/signal"
+	"net"
 
 	"github.com/google/uuid"
-	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 
 	"sync"
 )
@@ -40,13 +36,11 @@ type server struct {
 func (s *server) addPlayer(playerID string, gameType pb.GameType, stream pb.MatchRoom_MatchingServer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// プレイヤーを待機プレイヤーに追加
 	s.waitingPlayers[gameType] = append(s.waitingPlayers[gameType], waitingPlayer{
 		playerID: playerID,
 		stream:   stream,
 		gameType: gameType,
 	})
-	log.Println(playerID, "を追加しました")
 }
 
 func (s *server) removePlayer(playerID string, gameType pb.GameType) {
@@ -65,26 +59,20 @@ func (s* server) matchPlayers(gameType pb.GameType) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// 指定したゲームタイプの待機プレイヤーを取得
 	players := s.waitingPlayers[gameType]
 	if len(players) >= 2 {
-
-		// マッチングしたプレイヤーを取得
-		// ここでは最初の2人を取得
 		player1 := players[0]
 		player2 := players[1]
 
-		// Room: ユニークなroomIDを生成
 		roomID := uuid.Must(uuid.NewRandom()).String()
 
 		// Room: マッチングしたプレイヤーを登録
 		room := &gameRoom{
 			roomID: roomID,
-			players: map[string]int32{player1.playerID: 0, player2.playerID: 0}, // 初期は鍵の数を0に設定
+			players: map[string]int32{player1.playerID: 0, player2.playerID: 0},
 			playerStreams: map[string]pb.MatchRoom_KeyCollectServer{},
 		}
 
-		// Room: アクティブな部屋に登録
 		s.activeRooms[roomID] = room
 
 		// Broadcast: 全てのプレイヤーにマッチングを通知
@@ -110,18 +98,14 @@ func (s* server) matchPlayers(gameType pb.GameType) {
 			}
 		}()
 
-		// マッチングしたプレイヤーを待機プレイヤーから削除
 		s.waitingPlayers[gameType] = s.waitingPlayers[gameType][2:]
 	}
 }
 
 func (s *server) KeyCollect(stream pb.MatchRoom_KeyCollectServer) error {
-	// プレイヤーがKeyCollect streamを開いたことを通知
-	log.Println("KeyCollect stream opened")
     var roomID string
     var playerID string
 
-	// ストリームからのリクエストを受け取る(プレイヤーからのリクエスト)
     req, err := stream.Recv()
     if err != nil {
         log.Printf("error receiving key collect request: %v", err)
@@ -130,9 +114,6 @@ func (s *server) KeyCollect(stream pb.MatchRoom_KeyCollectServer) error {
 
     roomID = req.RoomId
     playerID = req.PlayerId
-	// プレイヤーがどのRoomIDにリクエストを送っているかを確認
-	log.Printf("Received KeyCollect request for RoomID: %s, PlayerID: %s", roomID, playerID)
-
 
     // 部屋が存在するか確認
     s.mu.RLock()
@@ -150,13 +131,12 @@ func (s *server) KeyCollect(stream pb.MatchRoom_KeyCollectServer) error {
     // プレイヤーをstreamに登録
     room.mu.Lock()
     room.playerStreams[playerID] = stream
-	log.Printf("Player %s registered in room %s", playerID, roomID)
+
     // 全プレイヤーが揃った場合のみ初回通知を送信
     if len(room.playerStreams) == 2 {
-		log.Printf("2人のプレイヤーが揃いました")
         for pid, playerStream := range room.playerStreams {
             err := playerStream.Send(&pb.KeyCollectResponse{
-                Message:    "プレイヤーが揃いました。ゲームが開始されます。",
+                Message:    "ゲームが開始されました",
                 RoomId:     roomID,
                 PlayerKeys: room.players,
                 IsGameOver: false,
@@ -247,40 +227,20 @@ func (s *server) Matching(req *pb.MatchRequest, stream pb.MatchRoom_MatchingServ
 
 func main() {
 	port := 8081
-	grpcServer := grpc.NewServer()
-	pb.RegisterMatchRoomServer(grpcServer, &server{
+	log.Printf("Server starting on port %d", port)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	s := grpc.NewServer()
+	pb.RegisterMatchRoomServer(s, &server{
 		waitingPlayers: make(map[pb.GameType][]waitingPlayer),
-		activeRooms:    make(map[string]*gameRoom),
+		activeRooms: make(map[string]*gameRoom),
 	})
-	reflection.Register(grpcServer)
 
-	// gRPC-Web サーバーのラップ
-	grpcWebServer := grpcweb.WrapServer(grpcServer, grpcweb.WithCorsForRegisteredEndpointsOnly(false), grpcweb.WithOriginFunc(func(origin string) bool { return true }))
-
-	// HTTP サーバーの起動とリクエストハンドリング
-	handler := func(resp http.ResponseWriter, req *http.Request) {
-		if grpcWebServer.IsGrpcWebRequest(req) || grpcWebServer.IsGrpcWebSocketRequest(req) {
-			grpcWebServer.ServeHTTP(resp, req)
-			return
-		}
-		http.NotFound(resp, req)
+	log.Printf("Server listening at %v", port)
+	if err := s.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
 	}
-
-	httpServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: http.HandlerFunc(handler),
-	}
-
-	log.Printf("Server started on port %v", port)
-	go func() {
-		if err := httpServer.ListenAndServe(); err != nil {
-			log.Fatalf("failed to start server: %v", err)
-		}
-	}()
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt)
-	<-quit
-	log.Println("Stopping server...")
-	grpcServer.GracefulStop()
 }
