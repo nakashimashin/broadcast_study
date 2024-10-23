@@ -156,7 +156,7 @@ func (s *server) KeyCollect(stream pb.MatchRoom_KeyCollectServer) error {
 		log.Printf("2人のプレイヤーが揃いました")
         for pid, playerStream := range room.playerStreams {
             err := playerStream.Send(&pb.KeyCollectResponse{
-                Message:    "ゲームが開始されました",
+                Message:    "プレイヤーが揃いました。ゲームが開始されます。",
                 RoomId:     roomID,
                 PlayerKeys: room.players,
                 IsGameOver: false,
