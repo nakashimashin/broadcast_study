@@ -5,6 +5,7 @@ services:
     container_name: broadcast-grpc-server
     volumes:
       - ./backend/:/broadcast-grpc-server
+      - ./certs/:/broadcast-grpc-server/certs
     tty: true
     build:
       context: .
