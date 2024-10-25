@@ -4,21 +4,49 @@ import (
 	pb "broadcast_study/pkg/grpc"
 	"bufio"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 )
 
 func main() {
     // サーバーアドレス
     addr := "localhost:8081"
-    conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+    // サーバー証明書を読み込む
+    certFile := "../certs/cert.pem" // サーバー証明書のパスを指定
+    cert, err := ioutil.ReadFile(certFile)
+    if err != nil {
+        log.Fatalf("failed to read server certificate: %v", err)
+    }
+
+    // 読み込んだ証明書を使って証明書プールを作成
+    certPool := x509.NewCertPool()
+    if !certPool.AppendCertsFromPEM(cert) {
+        log.Fatalf("failed to add server certificate to cert pool")
+    }
+
+    // // TLS設定を作成
+    // creds := credentials.NewClientTLSFromCert(certPool, "")
+
+    // TLS設定を作成（サーバー名検証を無効化）
+    creds := credentials.NewTLS(&tls.Config{
+        RootCAs:            certPool,
+        InsecureSkipVerify: true, // サーバー名検証を無効化
+    })
+
+
+    // gRPC接続を作成
+    conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(creds))
     if err != nil {
         log.Fatalf("did not connect: %v", err)
     }
