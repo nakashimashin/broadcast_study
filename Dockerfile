@@ -16,6 +16,5 @@ RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 RUN go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
 
 COPY ./backend .
-COPY ./certs /broadcast-grpc-server/certs
 
 CMD ["air", "-c", ".air.toml"]
