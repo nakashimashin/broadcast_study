@@ -6,8 +6,8 @@ option go_package = "pkg/grpc";
 
 enum GameType {
     KEY_COLLECTION = 0;
-    Battle_Game = 1;
-    Janken = 2;
+    POSITION_GAME = 1;
+    BOMB_GAME = 2;
 }
 
 service MatchRoom {
