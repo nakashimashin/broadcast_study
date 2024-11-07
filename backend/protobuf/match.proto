@@ -13,6 +13,7 @@ enum GameType {
 service MatchRoom {
     rpc Matching (MatchRequest) returns (stream MatchResponse);
     rpc KeyCollect (stream KeyCollectRequest) returns (stream KeyCollectResponse);
+    rpc PositionGame (stream PositionGameRequest) returns (stream PositionGameResponse);
 }
 
 message MatchRequest {
@@ -39,4 +40,24 @@ message KeyCollectResponse {
     map<string, int32> player_keys = 3;
     bool is_game_over = 4;
     string result = 5;
+}
+
+message PositionGameRequest {
+    string room_id = 1;
+    string player_id = 2;
+    int32 x = 3;
+    int32 y = 4;
+}
+
+message PositionGameResponse {
+    string message = 1;
+    string room_id = 2;
+    map<string, Position> player_positions = 3;
+    bool is_game_over = 4;
+    string result = 5;
+}
+
+message Position {
+    int32 x = 1;
+    int32 y = 2;
 }
