@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MatchRoom_Matching_FullMethodName   = "/match.MatchRoom/Matching"
-	MatchRoom_KeyCollect_FullMethodName = "/match.MatchRoom/KeyCollect"
+	MatchRoom_Matching_FullMethodName     = "/match.MatchRoom/Matching"
+	MatchRoom_KeyCollect_FullMethodName   = "/match.MatchRoom/KeyCollect"
+	MatchRoom_PositionGame_FullMethodName = "/match.MatchRoom/PositionGame"
 )
 
 // MatchRoomClient is the client API for MatchRoom service.
@@ -29,6 +30,7 @@ const (
 type MatchRoomClient interface {
 	Matching(ctx context.Context, in *MatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MatchResponse], error)
 	KeyCollect(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[KeyCollectRequest, KeyCollectResponse], error)
+	PositionGame(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PositionGameRequest, PositionGameResponse], error)
 }
 
 type matchRoomClient struct {
@@ -71,12 +73,26 @@ func (c *matchRoomClient) KeyCollect(ctx context.Context, opts ...grpc.CallOptio
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MatchRoom_KeyCollectClient = grpc.BidiStreamingClient[KeyCollectRequest, KeyCollectResponse]
 
+func (c *matchRoomClient) PositionGame(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PositionGameRequest, PositionGameResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &MatchRoom_ServiceDesc.Streams[2], MatchRoom_PositionGame_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[PositionGameRequest, PositionGameResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MatchRoom_PositionGameClient = grpc.BidiStreamingClient[PositionGameRequest, PositionGameResponse]
+
 // MatchRoomServer is the server API for MatchRoom service.
 // All implementations must embed UnimplementedMatchRoomServer
 // for forward compatibility.
 type MatchRoomServer interface {
 	Matching(*MatchRequest, grpc.ServerStreamingServer[MatchResponse]) error
 	KeyCollect(grpc.BidiStreamingServer[KeyCollectRequest, KeyCollectResponse]) error
+	PositionGame(grpc.BidiStreamingServer[PositionGameRequest, PositionGameResponse]) error
 	mustEmbedUnimplementedMatchRoomServer()
 }
 
@@ -92,6 +108,9 @@ func (UnimplementedMatchRoomServer) Matching(*MatchRequest, grpc.ServerStreaming
 }
 func (UnimplementedMatchRoomServer) KeyCollect(grpc.BidiStreamingServer[KeyCollectRequest, KeyCollectResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method KeyCollect not implemented")
+}
+func (UnimplementedMatchRoomServer) PositionGame(grpc.BidiStreamingServer[PositionGameRequest, PositionGameResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method PositionGame not implemented")
 }
 func (UnimplementedMatchRoomServer) mustEmbedUnimplementedMatchRoomServer() {}
 func (UnimplementedMatchRoomServer) testEmbeddedByValue()                   {}
@@ -132,6 +151,13 @@ func _MatchRoom_KeyCollect_Handler(srv interface{}, stream grpc.ServerStream) er
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MatchRoom_KeyCollectServer = grpc.BidiStreamingServer[KeyCollectRequest, KeyCollectResponse]
 
+func _MatchRoom_PositionGame_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MatchRoomServer).PositionGame(&grpc.GenericServerStream[PositionGameRequest, PositionGameResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MatchRoom_PositionGameServer = grpc.BidiStreamingServer[PositionGameRequest, PositionGameResponse]
+
 // MatchRoom_ServiceDesc is the grpc.ServiceDesc for MatchRoom service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -148,6 +174,12 @@ var MatchRoom_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "KeyCollect",
 			Handler:       _MatchRoom_KeyCollect_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "PositionGame",
+			Handler:       _MatchRoom_PositionGame_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
