@@ -16,7 +16,6 @@ func main() {
 	// 証明書と秘密鍵のパス
 	certFile := "/broadcast-grpc-server/certs/cert.pem"
 	keyFile := "/broadcast-grpc-server/certs/key.pem"
-	log.Printf("certFile: %s, keyFile: %s", certFile, keyFile)
 
 	// TLS認証情報の読み込み
 	creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
