@@ -27,6 +27,7 @@ type server struct {
     mu             sync.RWMutex
 }
 
+// 新しいサーバのインスタンスを作成
 func NewServer() *server {
 	return &server{
 		waitingPlayers: make(map[pb.GameType][]waitingPlayer),
